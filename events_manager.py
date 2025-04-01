@@ -65,7 +65,6 @@ def remove_overlaps(segments):
     return result
 
 
-
 ####### boxing functions
 # %%
 def detect_box_score_difference_events(box_data, threshold=5, pre=10, post=5, fps=30):
@@ -115,6 +114,7 @@ def detect_box_first_hit_event(box_data, pre=5, post=10, fps=30):
 
 ############ turmoil functions
 
+
 def detect_turmoil_score_stagnation(turm_data, stagnation=10, fps=30):
     events = []
     start_idx = 250
@@ -122,22 +122,20 @@ def detect_turmoil_score_stagnation(turm_data, stagnation=10, fps=30):
         player_score = turm_data[start_idx, 9]
         end_idx = start_idx
         # Extend while scores do not change
-        while (
-            end_idx < len(turm_data)
-            and turm_data[end_idx, 9] == player_score
-        ):
+        while end_idx < len(turm_data) and turm_data[end_idx, 9] == player_score:
             end_idx += 1
         if (end_idx - start_idx) >= stagnation * fps:
             events.append((start_idx, end_idx - 1))
         start_idx = end_idx
     return remove_overlaps(events)
 
+
 def detect_turmoil_tank_destruction(turm_data, pre=10, post=5, fps=30):
     events = []
     appear = None
     destroyed = None
     for i in range(250, len(turm_data)):
-        obstacles = turm_data[i, [range(62,69)]]
+        obstacles = turm_data[i, 62:69]
 
         if 10 in obstacles:
             if appear is None:
@@ -151,6 +149,7 @@ def detect_turmoil_tank_destruction(turm_data, pre=10, post=5, fps=30):
                 # break
     return remove_overlaps(events)
 
+
 def detect_turmoil_death(turm_data, pre=10, post=5, fps=30):
     events = []
     for i in range(250, len(turm_data)):
@@ -161,24 +160,71 @@ def detect_turmoil_death(turm_data, pre=10, post=5, fps=30):
             events.append((start_frame, end_frame))
     return remove_overlaps(events)
 
-def detect_turmoil_prize(turm_data, pre=10, post=5, fps=30):
+
+def detect_turmoil_prize(turm_data, pre=3, post=3, fps=30):
     events = []
-    for i in range(250, len(turm_data)):
-        prizes_collected = turm_data[i, 57]
-        if turm_data[i - 1, 57] < prizes_collected:
+    appear = None  # Frame index where prize first appears
+    removed = None  # Frame index where prize disappears
+
+    for i in range(270, len(turm_data)):  # Start checking from frame 250
+        obstacles = turm_data[i, 62:69]  # Get the 7 obstacle values
+
+        if 3 in obstacles:  # Prize appears
+            if appear is None:
+                appear = i  # Record first appearance
+        else:  # Prize is missing
+            if appear is not None:  # Prize was present before but now gone
+                removed = i
+                start_frame = max(
+                    0, appear - int(pre * fps)
+                )  # Ensure start_frame is >= 0
+                end_frame = min(
+                    removed + int(post * fps), len(turm_data) - 1
+                )  # Ensure end_frame is within bounds
+                events.append((start_frame, end_frame))
+
+                # Reset for detecting another prize event
+                appear = None
+                removed = None
+
+    return remove_overlaps(events)
+    # break
+    return remove_overlaps(events)
+
+
+# Word Zapper
+
+
+def detect_word_freebie_use(word_data, pre=5, post=7, fps=30):
+    events = []
+    for i in range(300, len(word_data)):
+        freebie_shots = word_data[i, 96]
+        if word_data[i - 1, 96] == 0 and freebie_shots > 0:
             start_frame = i - int(pre * fps)
             end_frame = i + int(post * fps)
             events.append((start_frame, end_frame))
     return remove_overlaps(events)
 
 
-
+def detect_word_letter_stagnation(word_data, stagnation=10, fps=30):
+    events = []
+    start_idx = 300
+    while start_idx < len(word_data):
+        letter_index = word_data[start_idx, 88]
+        end_idx = start_idx
+        # Extend while scores do not change
+        while end_idx < len(word_data) and word_data[end_idx, 88] == letter_index:
+            end_idx += 1
+        if (end_idx - start_idx) >= stagnation * fps:
+            events.append((start_idx, end_idx - 1))
+        start_idx = end_idx
+    return remove_overlaps(events)
 
 
 # %%
 
 test_load = np.load(
-    ".logs/78b53389-118b-43d7-888b-0a07b96eb2b3_Turmoil-v5_0_1743084930459.npz",
+    ".logs/78b53389-118b-43d7-888b-0a07b96eb2b3_WordZapper-v5_0_1743085051848.npz",
     allow_pickle=True,
 )
 
@@ -188,24 +234,27 @@ game_states = np.array([frame["obs_tp1"]["state"] for frame in game_data], dtype
 game_frames = np.array([frame["obs_tp1"]["pixels"] for frame in game_data])
 game_frames = game_frames[..., ::-1]
 
+# print(game_frames.shape)
+
 
 event_functions = {
     "Boxing": {
         "score_difference": detect_box_score_difference_events,
         "score_stagnation": detect_box_score_stagnation_events,
-        "first_hit": detect_box_first_hit_event
+        "first_hit": detect_box_first_hit_event,
     },
     "Turmoil": {
         "score_stagnation": detect_turmoil_score_stagnation,
         "tank_destruction": detect_turmoil_tank_destruction,
-
-    }
+        "death": detect_turmoil_death,
+        "prize_detection": detect_turmoil_prize,
+    },
 }
 
 for i, (s_frame, e_frame) in enumerate(
-    detect_turmoil_prize(
+    detect_word_letter_stagnation(
         game_states,
     )
 ):
-    event_frames = game_frames[[f for f in range(s_frame, e_frame)]]
-    create_video(event_frames, f"prizes_collected_{i}.avi")
+    event_frames = game_frames[range(s_frame, e_frame)]
+    create_video(event_frames, f"stagnation_{i}.avi")

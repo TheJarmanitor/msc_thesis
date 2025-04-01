@@ -3,7 +3,7 @@ import numpy as np
 
 
 test_load = np.load(
-    ".logs/78b53389-118b-43d7-888b-0a07b96eb2b3_Turmoil-v5_0_1743084930459.npz",
+    ".logs/78b53389-118b-43d7-888b-0a07b96eb2b3_WordZapper-v5_1_1743085494057.npz",
     allow_pickle=True,
 )
 
