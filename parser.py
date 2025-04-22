@@ -1,18 +1,29 @@
 # %%
 import numpy as np
+from pathlib import Path
+# %%
+logs_folder = ".logs"
+logs_path = Path(logs_folder)
+game_files=list(logs_path.glob(f"*WordZapper*.npz"))
 
-
-test_load = np.load(
-    ".logs/78b53389-118b-43d7-888b-0a07b96eb2b3_WordZapper-v5_1_1743085494057.npz",
+sessions_load = [
+    np.load(
+    file,
     allow_pickle=True,
-)
+    ) for file in game_files
+]
 
-game_data = test_load.f.arr_0
+session_data = [load.f.arr_0 for load in sessions_load]
+# %%
+for session in session_data:
+    game_states = np.array([frame["obs_tp1"]["state"] for frame in session])
+    game_actions = np.array([frame["action"] for frame in session])
+    game_mode = session[0]["game_mode"]
+    game_difficulty = session[0]["game_mode"]
+    participant_id = session[0]["participant_id"]
+    print(range(len(session)))
 
-game_states = np.array([frame["obs_tp1"]["state"] for frame in game_data])
-
-
-for i in range(len(game_states)):
-    print(game_states[i, 80])
+# for i in range(len(game_states)):
+#     print(game_actions[i])
 # print(np.max(game_states[:, 105:109], axis=0))
 # %%
