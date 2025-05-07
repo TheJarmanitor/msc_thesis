@@ -15,7 +15,6 @@ atari_dataframes = []
 for file in game_files:
     with np.load(file, allow_pickle=True) as data:
         session = data.f.arr_0
-        print(session)
         game_states = np.array([frame["obs_tp1"]["state"] for frame in session])
         state_names = [f"ram_{i}" for i in range(game_states.shape[1])]
         game_actions = np.array([frame["action"] for frame in session])
@@ -34,7 +33,6 @@ for file in game_files:
         temp_df = temp_df.rename_axis('frame').reset_index()
         temp_df = temp_df.loc[:, ["participant_id", "game_name", "trial", "mode", "difficulty", "frame", "action"] + state_names]
         atari_dataframes.append(temp_df)
-        break
 
 # %%
 atari_df = pd.concat(atari_dataframes, ignore_index=True)
